@@ -19,15 +19,15 @@ type Postgres struct {
 }
 
 type User struct {
-	ID       int    `json:"id" db:"user_id"`
-	Username string `json:"username"`
-	Display  string `json:"display"`
-	Password string `json:"password"`
+	ID       uuid.UUID `json:"id"`
+	Username string    `json:"username"`
+	Display  string    `json:"display"`
+	Password string    `json:"password"`
 }
 
 type Session struct {
 	ID     uuid.UUID `json:"session_id"`
-	UserID int       `json:"user_id"`
+	UserID uuid.UUID `json:"user_id"`
 	Expiry time.Time `json:"expiry"`
 }
 
@@ -74,7 +74,9 @@ func (p *Postgres) CreateUser(user *User) error {
 		return err
 	}
 
-	rows, err := p.conn.Query(context.Background(), "INSERT INTO users (username, password, display) VALUES ($1, $2, $3)", user.Username, string(hash), user.Display)
+	p.logger.Infof("user id: %v\n", user.ID)
+
+	rows, err := p.conn.Query(context.Background(), "INSERT INTO users (id, username, password, display) VALUES ($1, $2, $3, $4)", user.ID, user.Username, string(hash), user.Display)
 	if err != nil {
 		p.logger.Errorf("Error creating new user %v\n", err)
 		return err

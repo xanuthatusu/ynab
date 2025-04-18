@@ -83,6 +83,8 @@ func addRoutes(
 		}
 
 		logger.Infof("user: %v\n", user)
+
+		user.ID = uuid.New()
 		if err := pg.CreateUser(&user); err != nil {
 			if err.Error() == "duplicate username" {
 				w.WriteHeader(http.StatusOK)
