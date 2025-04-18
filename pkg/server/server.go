@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -133,7 +134,41 @@ func addRoutes(
 			return
 		}
 
-		w.Write([]byte("{\"status\": \"success\"}"))
+		fmt.Fprintf(w, "{\"status\": \"success\", \"session\": \"%s\"}", session.ID)
+	})
+
+	mux.HandleFunc("/budget", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			logger.Errorf("Invalid Method!")
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("{\"status\": \"invalid method\"}"))
+			return
+		}
+
+		authHeader := r.Header.Values("Authorization")
+		if len(authHeader) <= 0 {
+			logger.Errorf("Could not find auth token")
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte("{\"status\": \"could not find auth token\"}"))
+			return
+		}
+
+		sessionID := strings.Split(authHeader[0], " ")[1]
+
+		if !pg.SessionIsValid(sessionID) {
+			if _, err := pg.CleanSessions(); err != nil {
+				logger.Errorf("error cleaning sessions: %v\n", err)
+			}
+
+			logger.Error("Session is not valid!")
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte("{\"status\": \"unauthorized\"}"))
+			return
+		}
+
+		w.WriteHeader(http.StatusNotImplemented)
+		w.Write([]byte("{\"status\": \"unimplemented\"}"))
+		return
 	})
 }
 

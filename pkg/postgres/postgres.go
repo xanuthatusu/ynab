@@ -26,9 +26,37 @@ type User struct {
 }
 
 type Session struct {
-	ID     uuid.UUID `json:"session_id"`
+	ID     uuid.UUID `json:"id"`
 	UserID uuid.UUID `json:"user_id"`
 	Expiry time.Time `json:"expiry"`
+}
+
+type Budget struct {
+	ID    uuid.UUID `json:"id"`
+	Owner uuid.UUID `json:"owner"`
+	Name  string    `json:"name"`
+}
+
+type Category struct {
+	ID     uuid.UUID `json:"id"`
+	Budget uuid.UUID `json:"budget"`
+	Name   string    `json:"name"`
+}
+
+type Goal struct {
+	ID       uuid.UUID `json:"id"`
+	Category uuid.UUID `json:"category"`
+	Name     string    `json:"name"`
+	GoalType string    `json:"goal_type"`
+	Target   int       `json:"target"`
+	Bank     int       `json:"bank"`
+}
+
+type Account struct {
+	ID             uuid.UUID `json:"id"`
+	AccountType    string    `json:"account_type"`
+	Reconciled     int       `json:"reconciled"`
+	LastReconciled time.Time `json:"last_reconciled"`
 }
 
 func New(logger *logrus.Logger) *Postgres {
@@ -44,7 +72,7 @@ func (p *Postgres) Close() {
 }
 
 func (p *Postgres) GetUser(username string) (*User, error) {
-	rows, err := p.conn.Query(context.Background(), "SELECT user_id, display, username, password FROM users WHERE username=$1", username)
+	rows, err := p.conn.Query(context.Background(), "SELECT id, display, username, password FROM users WHERE username=$1", username)
 	if err != nil {
 		p.logger.Errorf("Error fetching users: %v\n", err)
 		return nil, err
@@ -99,4 +127,47 @@ func (p *Postgres) CreateSession(session *Session) error {
 	}
 
 	return nil
+}
+
+func (p *Postgres) SessionIsValid(id string) bool {
+	rows, err := p.conn.Query(context.Background(), "SELECT id, user_id, expiry FROM sessions WHERE id=$1", id)
+	if err != nil {
+		p.logger.Errorf("Error getting session: %v\n", err)
+		return false
+	}
+
+	var session Session
+	var found bool = false
+
+	_, err = pgx.ForEachRow(rows, []any{&session.ID, &session.UserID, &session.Expiry}, func() error {
+		if session.ID.String() != id {
+			return nil
+		}
+		// p.logger.Infof("time.now comparison: %d\n", time.Now().Compare(session.Expiry))
+		if time.Now().Compare(session.Expiry) >= 0 {
+			p.logger.Error("Past expiry date for session!")
+			return nil
+		}
+		found = true
+		return nil
+	})
+
+	if err != nil {
+		p.logger.Errorf("Error iterating: %v\n", err)
+		return false
+	}
+
+	return found
+}
+
+func (p *Postgres) CleanSessions() (int, error) {
+	timeString := time.Now().UTC().String()
+	result, err := p.conn.Exec(context.Background(), "DELETE FROM sessions WHERE expiry < $1", timeString[:len(timeString)-10])
+	if err != nil {
+		p.logger.Errorf("error deleting sessions: %v\n", err)
+	}
+
+	p.logger.Infof("deleted %d rows of expired sessions", result.RowsAffected())
+
+	return int(result.RowsAffected()), nil
 }
