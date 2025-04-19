@@ -26,20 +26,18 @@ func addRoutes(
 ) {
 	mux.HandleFunc("/user/{username}", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" {
-			w.Write([]byte("wrong method"))
+			fmt.Fprintf(w, "wrong method")
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
-		// return nil
+
 		username := strings.Split(r.URL.Path, "/")[2]
 		user, err := pg.GetUser(username)
 		if err != nil {
 			logger.Errorf("error getting user: %v\n", err)
-			if _, err := w.Write([]byte("error fetching user: %v\n")); err != nil {
-				logger.Errorf("Error writing error %v\n", err)
-			}
 			return
 		}
+
 		data, err := json.Marshal(user)
 		if err != nil {
 			logger.Errorf("error marshalling user: %v\n", err)
@@ -50,8 +48,8 @@ func addRoutes(
 
 	mux.HandleFunc("/user", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "PUT" {
-			w.Write([]byte("wrong method"))
 			w.WriteHeader(http.StatusMethodNotAllowed)
+			fmt.Fprintf(w, `{"status": "wrong method"}`)
 			return
 		}
 
@@ -73,7 +71,7 @@ func addRoutes(
 		if err := pg.CreateUser(&user); err != nil {
 			if err.Error() == "duplicate username" {
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte("{\"status\": \"error\", \"error\": \"duplicate username\"}"))
+				fmt.Fprintf(w, `{"status": "error", "error": "duplicate username"}`)
 				return
 			}
 			logger.Errorf("Error creating user in db: %v\n", err)
@@ -81,7 +79,7 @@ func addRoutes(
 		}
 
 		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte("{\"status\": \"success\"}"))
+		fmt.Fprintf(w, `{"status": "success"}`)
 		return
 	})
 
@@ -113,14 +111,14 @@ func addRoutes(
 		if err != nil {
 			logger.Errorf("Error fetching user: %v\n", err)
 			w.WriteHeader(http.StatusUnauthorized)
-			w.Write([]byte("{\"status\": \"invalid username\"}"))
+			fmt.Fprintf(w, `{"status": "invalid username"}`)
 			return
 		}
 
 		if err := bcrypt.CompareHashAndPassword([]byte(pgUser.Password), []byte(jsonUser.Password)); err != nil {
 			logger.Error("hash and pass differ")
 			w.WriteHeader(http.StatusUnauthorized)
-			w.Write([]byte("{\"status\": \"invalid password\"}"))
+			fmt.Fprintf(w, `{"status": "invalid password"}`)
 			return
 		}
 
@@ -134,14 +132,14 @@ func addRoutes(
 			return
 		}
 
-		fmt.Fprintf(w, "{\"status\": \"success\", \"session\": \"%s\"}", session.ID)
+		fmt.Fprintf(w, `{"status": "success", "session": "%s"}`, session.ID)
 	})
 
 	mux.HandleFunc("/budget", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
 			logger.Errorf("Invalid Method!")
 			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte("{\"status\": \"invalid method\"}"))
+			fmt.Fprintf(w, `{"status": "invalid method"}`)
 			return
 		}
 
@@ -149,7 +147,7 @@ func addRoutes(
 		if len(authHeader) <= 0 {
 			logger.Errorf("Could not find auth token")
 			w.WriteHeader(http.StatusUnauthorized)
-			w.Write([]byte("{\"status\": \"could not find auth token\"}"))
+			fmt.Fprintf(w, `{"status": "could not find auth token"}`)
 			return
 		}
 
@@ -162,12 +160,12 @@ func addRoutes(
 
 			logger.Error("Session is not valid!")
 			w.WriteHeader(http.StatusUnauthorized)
-			w.Write([]byte("{\"status\": \"unauthorized\"}"))
+			fmt.Fprintf(w, `{"status": "unauthorized"}`)
 			return
 		}
 
 		w.WriteHeader(http.StatusNotImplemented)
-		w.Write([]byte("{\"status\": \"unimplemented\"}"))
+		fmt.Fprintf(w, `{"status": "unimplemented"}`)
 		return
 	})
 }
